@@ -28,6 +28,19 @@
   "ignoreDeps": [
     "github.com/pflege-de-labs/tranquila"
   ],
+  "customManagers": [
+    {
+      "description": "SCANNER_IMAGE is a plain `docker run` argument in ci.yml/release.yml, not a `uses:` reference, so the github-actions manager does not see it. It must keep moving with the SecObserve action pins it sits next to - see docs/adr/0007-secobserve-upload-correctness.md.",
+      "customType": "regex",
+      "managerFilePatterns": [
+        "/^\\.github/workflows/[^/]+\\.yml$/"
+      ],
+      "matchStrings": [
+        "SCANNER_IMAGE:\\s+(?<depName>[^\\s:@]+):(?<currentValue>[^\\s@]+)@(?<currentDigest>sha256:[0-9a-f]+)"
+      ],
+      "datasourceTemplate": "docker"
+    }
+  ],
   "packageRules": [
     {
       "description": "Go modules settle before they are proposed, and every update tidies the module it touched.",

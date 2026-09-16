@@ -19,6 +19,9 @@ permissions:
 
 env:
   IMAGE: ghcr.io/${{ github.repository }}
+  # Run directly rather than through upstream's upload_sbom action, whose
+  # entrypoint cannot report failure. See docs/adr/0007-secobserve-upload-correctness.md.
+  SCANNER_IMAGE: ghcr.io/secobserve/secobserve-scanners:2026_08@sha256:7dd952f02a9a8262b61399bb65abdeea9c8b5b8628aa4788ba7d411d198931ab
 
 jobs:
   checks:
@@ -193,28 +196,53 @@ jobs:
       # on first import, and a transient PR branch has no reason to leave a
       # permanent-ish trace in a findings tool — main and workflow_dispatch
       # builds are what actually matters to track over time.
-      - name: Extract the image's SBOM attestation to a file
+      # buildx keys a multi-platform image's .SBOM by platform and SecObserve
+      # detects only a bare SPDX document, hence the unwrap and the guard — see
+      # docs/adr/0007-secobserve-upload-correctness.md.
+      - name: Extract the image's SBOM attestations to files
         if: github.event_name != 'pull_request'
         env:
           DIGEST: ${{ steps.build.outputs.digest }}
-        run: docker buildx imagetools inspect "${IMAGE}@${DIGEST}" --format '{{ json .SBOM }}' > sbom.json
+        run: |
+          docker buildx imagetools inspect "${IMAGE}@${DIGEST}" \
+            --format '{{ json .SBOM }}' > sbom-raw.json
+          for platform in linux/amd64 linux/arm64; do
+            out="sbom-$(echo "$platform" | tr '/' '-').json"
+            jq --arg p "$platform" '.[$p].SPDX' sbom-raw.json > "$out"
+            if ! jq -e 'has("SPDXID") and has("spdxVersion")' "$out" > /dev/null; then
+              echo "::error::${out} is not a bare SPDX document"
+              exit 1
+            fi
+          done
 
-      - name: Upload the SBOM to SecObserve
+      # One upload per platform: SecObserve keys a vulnerability check on the
+      # file name, so both land instead of overwriting each other.
+      - name: Upload the SBOMs to SecObserve
+        id: sbom_upload
         if: github.event_name != 'pull_request'
-        uses: SecObserve/secobserve_actions_templates/actions/upload_sbom@0a0f7d0981982a589f2a11c3f05c8e1c628fbd79 # v2026_08
-        with:
-          so_api_base_url: https://webhooks.management.p4e.io/secobserve
-          so_api_token: ${{ secrets.SO_API_TOKEN }}
-          so_product_name: tranquila
-          so_branch_name: ${{ github.ref_name }}
-          so_file_name: sbom.json
-          so_origin_service: tranquila
+        continue-on-error: true
+        env:
+          SO_API_BASE_URL: https://webhooks.management.p4e.io/secobserve
+          SO_API_TOKEN: ${{ secrets.SO_API_TOKEN }}
+          SO_PRODUCT_NAME: tranquila
+          SO_BRANCH_NAME: ${{ github.ref_name }}
+          SO_ORIGIN_SERVICE: tranquila
+        run: |
+          for sbom in sbom-linux-*.json; do
+            docker run --rm -v "${PWD}:/workspace" -w /workspace \
+              -e SO_API_BASE_URL -e SO_API_TOKEN -e SO_PRODUCT_NAME \
+              -e SO_BRANCH_NAME -e SO_ORIGIN_SERVICE -e SO_FILE_NAME="$sbom" \
+              --entrypoint /entrypoints/entrypoint_upload_sbom.sh \
+              "$SCANNER_IMAGE"
+          done
 
       # Scans the exact digest that was just signed, not a tag that could move
       # under it between the build and this step. Vulnerability observations
       # (CycloneDX, findings embedded) upload as part of the same action call.
       - name: Scan the image with Trivy and upload results to SecObserve
+        id: trivy_scan
         if: github.event_name != 'pull_request'
+        continue-on-error: true
         uses: SecObserve/secobserve_actions_templates/actions/SCA/trivy_image@0a0f7d0981982a589f2a11c3f05c8e1c628fbd79 # v2026_08
         env:
           DIGEST: ${{ steps.build.outputs.digest }}
@@ -227,3 +255,21 @@ jobs:
           so_branch_name: ${{ github.ref_name }}
           so_origin_service: tranquila
           so_origin_docker_image_name_tag: ${{ env.IMAGE }}:${{ steps.commit.outputs.short_sha }}
+
+      # SecObserve is a findings tool, not a build gate: an outage there must
+      # not fail a build whose image already built and signed.
+      - name: Report the SecObserve upload outcome
+        if: ${{ !cancelled() && github.event_name != 'pull_request' }}
+        env:
+          SBOM_OUTCOME: ${{ steps.sbom_upload.outcome }}
+          TRIVY_OUTCOME: ${{ steps.trivy_scan.outcome }}
+        run: |
+          failed=""
+          if [ "$SBOM_OUTCOME" = "failure" ]; then failed="${failed} SBOM"; fi
+          if [ "$TRIVY_OUTCOME" = "failure" ]; then failed="${failed} Trivy"; fi
+          if [ -z "$failed" ]; then exit 0; fi
+          echo "::warning::SecObserve upload failed for:${failed} - see the step logs"
+          {
+            echo "> [!WARNING]"
+            echo "> SecObserve upload failed for:${failed}"
+          } >> "$GITHUB_STEP_SUMMARY"

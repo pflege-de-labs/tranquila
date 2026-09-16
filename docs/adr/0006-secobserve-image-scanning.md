@@ -1,6 +1,6 @@
 # 0006. Images are scanned with Trivy and reported to SecObserve
 
-* Status: Accepted
+* Status: Superseded by [0007](0007-secobserve-upload-correctness.md)
 * Date: 2026-09-15
 
 ## Context
