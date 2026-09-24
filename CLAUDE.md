@@ -122,6 +122,9 @@ Two traps worth not rediscovering:
   failed with an opaque `go: updates to go.mod needed` (PR #50). A packageRule enables them
   explicitly, and `go-checks.yml` checks both modules are tidy by name so the next occurrence says
   so directly.
+- **Major bumps of indirect deps are disabled.** A Go major is a new module path (`/vN`), so
+  Renovate cannot switch testcontainers from `cenkalti/backoff/v4` to `/v7`; it only adds an
+  unused `/v7` requirement that `go mod tidy` strips, failing the tidy check forever (PR #78).
 - **`ignoreTests: true` used to be set globally** while docker and github-actions automerged, so
   those merged without CI passing — including the actions that push to GHCR and sign with this
   repo's OIDC identity. Removed; automerge now waits for CI.

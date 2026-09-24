@@ -44,6 +44,9 @@ is now on, so a breaking major never rides along with a patch.
 
 **Renovate manages e2e's indirect dependencies explicitly**, so the module it cannot otherwise see
 is bumped and tidied in the same PR as the root change that requires it.
+Major updates of indirect dependencies are disabled: a Go major is a new module path, so only the
+module importing it can adopt it, and Renovate's added requirement is removed again by `go mod
+tidy` (PR #78).
 
 **CI checks both modules are tidy**, by name. The cause is subtle enough that discovering it from
 an opaque `updates to go.mod needed` cost real time once; a step that says so directly, and that
