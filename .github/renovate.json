@@ -66,6 +66,19 @@
       "enabled": true
     },
     {
+      "description": "A major Go bump is a new module path (/vN), so for an indirect dependency only whatever imports it can adopt it. Renovate adds an unused requirement that `go mod tidy` removes again, so the PR can never pass the tidy check - see PR #78 (cenkalti/backoff v4 -> v7, imported only by testcontainers).",
+      "matchManagers": [
+        "gomod"
+      ],
+      "matchDepTypes": [
+        "indirect"
+      ],
+      "matchUpdateTypes": [
+        "major"
+      ],
+      "enabled": false
+    },
+    {
       "description": "The AWS SDK ships ~20 modules that share internal versions; a partial bump does not compile, so they move together or not at all.",
       "matchManagers": [
         "gomod"
