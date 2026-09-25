@@ -11,7 +11,7 @@ env:
   IMAGE: ghcr.io/${{ github.repository }}
   # Run directly rather than through upstream's upload_sbom action, whose
   # entrypoint cannot report failure. See docs/adr/0007-secobserve-upload-correctness.md.
-  SCANNER_IMAGE: ghcr.io/secobserve/secobserve-scanners:2026_08@sha256:7dd952f02a9a8262b61399bb65abdeea9c8b5b8628aa4788ba7d411d198931ab
+  SCANNER_IMAGE: ghcr.io/secobserve/secobserve-scanners:2026_09@sha256:d32e7740a671927a3152da4d58ce1247b6634fc769625b441d795fb2f0468510
 
 jobs:
   # Cheap and first, so a misplaced tag fails in seconds rather than after the
