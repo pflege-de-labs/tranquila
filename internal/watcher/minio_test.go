@@ -140,6 +140,13 @@ func TestMinIOWatchBucket(t *testing.T) {
 			wantEvents: []ObjectEvent{{Bucket: "b1", Key: "k4", IsDelete: true}},
 		},
 		{
+			// ListenBucketNotification delivers keys unencoded (verified against
+			// a real server), unlike S3->SQS; decoding here would turn "+" into " ".
+			name:       "raw_key_passed_through_undecoded",
+			infos:      []notification.Info{makeNotifyInfo("b1", "dir/a b+c%2B.txt", 7)},
+			wantEvents: []ObjectEvent{{Bucket: "b1", Key: "dir/a b+c%2B.txt", Size: 7}},
+		},
+		{
 			name:       "created_event_leaves_isdelete_false",
 			infos:      []notification.Info{makeNotifyInfoWithEvent("b1", "k5", 5, "s3:ObjectCreated:Put")},
 			wantEvents: []ObjectEvent{{Bucket: "b1", Key: "k5", Size: 5, IsDelete: false}},

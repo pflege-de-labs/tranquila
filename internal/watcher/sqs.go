@@ -130,7 +130,7 @@ func (w *SQSWatcher) processMessage(ctx context.Context, body *string, receiptHa
 	for _, rec := range notification.Records {
 		out <- ObjectEvent{
 			Bucket:   rec.S3.Bucket.Name,
-			Key:      rec.S3.Object.Key,
+			Key:      decodeEventKey(rec.S3.Bucket.Name, rec.S3.Object.Key),
 			Size:     rec.S3.Object.Size,
 			IsDelete: strings.HasPrefix(rec.EventName, "ObjectRemoved"),
 		}
