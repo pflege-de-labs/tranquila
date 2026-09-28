@@ -321,7 +321,9 @@ this suite noticeably slower.
 ### Images
 
 Pinned in `harness_test.go`, all multi-arch (`linux/amd64` + `linux/arm64`) so
-the same tags work on an Apple Silicon laptop and an x86 CI runner:
+the same tags work on an Apple Silicon laptop and an x86 CI runner. Renovate bumps
+Silo and Toxiproxy (a regex manager in `.github/renovate.json`); Redis and Valkey
+float within their major line on purpose and are not tracked:
 
 | Image | Note |
 | --- | --- |
