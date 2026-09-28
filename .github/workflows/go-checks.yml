@@ -56,7 +56,7 @@ jobs:
           fi
 
   e2e:
-    name: End-to-End (MinIO + Toxiproxy)
+    name: End-to-End (Silo + Toxiproxy)
     if: inputs.run-e2e
     runs-on: ubuntu-latest
     steps:

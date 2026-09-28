@@ -18,18 +18,18 @@ import (
 )
 
 const (
-	// Pinned deliberately. Note the community MinIO image publishes arm64 only
-	// on plain RELEASE tags — the enterprise *.hotfix.* tags are amd64-only and
-	// fail to start on Apple Silicon.
-	minioImage     = "quay.io/minio/minio:RELEASE.2025-09-07T16-13-09Z"
+	// Silo is a maintained MinIO fork (https://github.com/pgsty/silo). MinIO
+	// ended community image distribution; quay.io/minio/minio now answers 401.
+	// Pinned to a multi-arch RELEASE tag (amd64 + arm64), not latest.
+	siloImage      = "docker.io/pgsty/silo:RELEASE.2026-09-16T00-00-00Z"
 	toxiproxyImage = "ghcr.io/shopify/toxiproxy:2.12.0"
 	redisImage     = "redis:7-alpine"
 
-	minioUser = "minioadmin"
-	minioPass = "minioadmin"
+	s3User = "minioadmin"
+	s3Pass = "minioadmin"
 
-	// Port inside the toxiproxy container that fronts MinIO.
-	toxicMinioPort = "8666"
+	// Port inside the toxiproxy container that fronts Silo.
+	toxicS3Port = "8666"
 )
 
 // kvEngines are the Redis-compatible engines the state layer is verified
@@ -96,10 +96,10 @@ func forEachEngine(t *testing.T, fn func(t *testing.T, st *state.Store, rdb *red
 	}
 }
 
-// stack is the container fixture shared by a test: MinIO for object storage,
-// Redis for sync state, and Toxiproxy in front of MinIO for L4 fault injection.
+// stack is the container fixture shared by a test: Silo for object storage,
+// Redis for sync state, and Toxiproxy in front of Silo for L4 fault injection.
 type stack struct {
-	minioEndpoint string // direct, no faults
+	s3Endpoint    string // direct, no faults
 	toxicEndpoint string // via toxiproxy
 	redisAddr     string
 	toxics        *toxiproxy.Proxy
@@ -119,23 +119,24 @@ func newStack(t *testing.T) *stack {
 	}
 	t.Cleanup(func() { _ = net.Remove(context.Background()) })
 
-	minioC, err := testcontainers.GenericContainer(ctx, testcontainers.GenericContainerRequest{
+	// Silo keeps MinIO's MINIO_* variables and /minio/* routes unchanged.
+	siloC, err := testcontainers.GenericContainer(ctx, testcontainers.GenericContainerRequest{
 		ContainerRequest: testcontainers.ContainerRequest{
-			Image:          minioImage,
+			Image:          siloImage,
 			Cmd:            []string{"server", "/data"},
-			Env:            map[string]string{"MINIO_ROOT_USER": minioUser, "MINIO_ROOT_PASSWORD": minioPass},
+			Env:            map[string]string{"MINIO_ROOT_USER": s3User, "MINIO_ROOT_PASSWORD": s3Pass},
 			ExposedPorts:   []string{"9000/tcp"},
 			Networks:       []string{net.Name},
-			NetworkAliases: map[string][]string{net.Name: {"minio"}},
+			NetworkAliases: map[string][]string{net.Name: {"silo"}},
 			WaitingFor: wait.ForHTTP("/minio/health/live").
 				WithPort("9000/tcp").WithStartupTimeout(2 * time.Minute),
 		},
 		Started: true,
 	})
 	if err != nil {
-		t.Fatalf("start minio: %v", err)
+		t.Fatalf("start silo: %v", err)
 	}
-	t.Cleanup(func() { _ = testcontainers.TerminateContainer(minioC) })
+	t.Cleanup(func() { _ = testcontainers.TerminateContainer(siloC) })
 
 	redisC, err := testcontainers.GenericContainer(ctx, testcontainers.GenericContainerRequest{
 		ContainerRequest: testcontainers.ContainerRequest{
@@ -153,7 +154,7 @@ func newStack(t *testing.T) *stack {
 	toxiC, err := testcontainers.GenericContainer(ctx, testcontainers.GenericContainerRequest{
 		ContainerRequest: testcontainers.ContainerRequest{
 			Image:        toxiproxyImage,
-			ExposedPorts: []string{"8474/tcp", toxicMinioPort + "/tcp"},
+			ExposedPorts: []string{"8474/tcp", toxicS3Port + "/tcp"},
 			Networks:     []string{net.Name},
 			WaitingFor:   wait.ForListeningPort("8474/tcp").WithStartupTimeout(time.Minute),
 		},
@@ -165,8 +166,8 @@ func newStack(t *testing.T) *stack {
 	t.Cleanup(func() { _ = testcontainers.TerminateContainer(toxiC) })
 
 	s := &stack{}
-	if s.minioEndpoint, err = minioC.PortEndpoint(ctx, "9000/tcp", "http"); err != nil {
-		t.Fatalf("minio endpoint: %v", err)
+	if s.s3Endpoint, err = siloC.PortEndpoint(ctx, "9000/tcp", "http"); err != nil {
+		t.Fatalf("silo endpoint: %v", err)
 	}
 	redisEP, err := redisC.PortEndpoint(ctx, "6379/tcp", "")
 	if err != nil {
@@ -178,13 +179,13 @@ func newStack(t *testing.T) *stack {
 	if err != nil {
 		t.Fatalf("toxiproxy control endpoint: %v", err)
 	}
-	if s.toxicEndpoint, err = toxiC.PortEndpoint(ctx, toxicMinioPort+"/tcp", "http"); err != nil {
+	if s.toxicEndpoint, err = toxiC.PortEndpoint(ctx, toxicS3Port+"/tcp", "http"); err != nil {
 		t.Fatalf("toxiproxy proxied endpoint: %v", err)
 	}
 
 	// Listen on all interfaces inside the container so the mapped port reaches it.
 	tc := toxiproxy.NewClient(ctrlEP)
-	s.toxics, err = tc.CreateProxy("minio", "0.0.0.0:"+toxicMinioPort, "minio:9000")
+	s.toxics, err = tc.CreateProxy("silo", "0.0.0.0:"+toxicS3Port, "silo:9000")
 	if err != nil {
 		t.Fatalf("create toxiproxy proxy: %v", err)
 	}
@@ -200,8 +201,8 @@ func (s *stack) client(t *testing.T, name, endpoint string, rateLimit float64, f
 	c, err := storage.NewClient(context.Background(), storage.Config{
 		Endpoint:      endpoint,
 		Region:        "us-east-1",
-		AccessKey:     minioUser,
-		SecretKey:     minioPass,
+		AccessKey:     s3User,
+		SecretKey:     s3Pass,
 		RateLimit:     rateLimit,
 		FailThreshold: failThreshold,
 		Name:          name,
@@ -227,7 +228,7 @@ func (s *stack) store(t *testing.T) *state.Store {
 func (s *stack) seed(t *testing.T, bucket string, n int) []string {
 	t.Helper()
 	ctx := context.Background()
-	c := s.client(t, "seed", s.minioEndpoint, 0, 0)
+	c := s.client(t, "seed", s.s3Endpoint, 0, 0)
 	if err := c.EnsureBucket(ctx, bucket); err != nil {
 		t.Fatalf("ensure bucket %s: %v", bucket, err)
 	}
@@ -247,7 +248,7 @@ func (s *stack) seed(t *testing.T, bucket string, n int) []string {
 func (s *stack) countObjects(t *testing.T, bucket string, keys []string) int {
 	t.Helper()
 	ctx := context.Background()
-	c := s.client(t, "verify", s.minioEndpoint, 0, 0)
+	c := s.client(t, "verify", s.s3Endpoint, 0, 0)
 	var n int
 	for _, k := range keys {
 		if _, _, _, err := c.HeadObject(ctx, bucket, k); err == nil {

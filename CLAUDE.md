@@ -203,6 +203,8 @@ dependencies (moby, containerd) that must not enter the production module graph
 or `govulncheck` scope. A submodule can still import `internal/...` because the
 internal rule is lexical on import paths, not module-scoped.
 
+The S3 backend is **Silo** (`docker.io/pgsty/silo`), a maintained MinIO fork, not MinIO itself: MinIO ended community image distribution and `quay.io/minio/minio` now answers `401 unauthorized` to anonymous pulls, which failed every S3-backed e2e test with `start minio: ... unauthorized` while the Redis/Valkey state tests kept passing. Silo keeps `MINIO_*` env vars, `/minio/health/live` and `server /data` unchanged, so the fixture swap is the image line. Image pins in `harness_test.go` are Go consts, which no built-in Renovate manager reads; a `customManagers` regex tracks `siloImage`/`toxiproxyImage` only. `redisImage` and the `kvEngines` valkey entries are deliberately untracked: they float within a chosen major line (the compatibility matrix), and tracking them would propose majors that change what the matrix proves. Silo's `RELEASE.<timestamp>Z` tags need a `regex:` versioning rule placed *after* the catch-all docker rule (which forces `versioning: docker` and cannot order them); anchoring it also keeps Renovate off the `-amd64`/`-arm64`/`-distroless` variants.
+
 Two fault injectors, because they cover different layers:
 
 - **Toxiproxy** (container) is L4 only — `latency`, `down`, `bandwidth`,

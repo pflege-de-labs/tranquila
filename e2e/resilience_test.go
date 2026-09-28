@@ -42,9 +42,9 @@ func TestSyncCompletesDespiteTransient504(t *testing.T) {
 	s := newStack(t)
 	keys := s.seed(t, "burst-src", 5)
 
-	srcProxy := newFaultProxy(t, s.minioEndpoint)
+	srcProxy := newFaultProxy(t, s.s3Endpoint)
 	src := s.client(t, "source", srcProxy.URL(), 0, 0)
-	dst := s.client(t, "destination", s.minioEndpoint, 0, 0)
+	dst := s.client(t, "destination", s.s3Endpoint, 0, 0)
 
 	// Fail the opening requests of the run, within the retry budget.
 	srcProxy.failNext(3, http.StatusGatewayTimeout, true)
@@ -70,8 +70,8 @@ func TestWatchSurvivesSustainedOutage(t *testing.T) {
 	s := newStack(t)
 	keys := s.seed(t, "outage-src", 3)
 
-	dstProxy := newFaultProxy(t, s.minioEndpoint)
-	src := s.client(t, "source", s.minioEndpoint, 0, 0)
+	dstProxy := newFaultProxy(t, s.s3Endpoint)
+	src := s.client(t, "source", s.s3Endpoint, 0, 0)
 	dst := s.client(t, "destination", dstProxy.URL(), 0, 0)
 	syncer := syncerFor(t, s, src, dst, "outage-src", "outage-dst")
 
@@ -117,8 +117,8 @@ func TestWatchTerminatesOnPermanentError(t *testing.T) {
 	s := newStack(t)
 	s.seed(t, "perm-src", 1)
 
-	dstProxy := newFaultProxy(t, s.minioEndpoint)
-	src := s.client(t, "source", s.minioEndpoint, 0, 0)
+	dstProxy := newFaultProxy(t, s.s3Endpoint)
+	src := s.client(t, "source", s.s3Endpoint, 0, 0)
 	dst := s.client(t, "destination", dstProxy.URL(), 0, 0)
 	syncer := syncerFor(t, s, src, dst, "perm-src", "perm-dst")
 
@@ -159,7 +159,7 @@ func TestRateLimitDegradesAndRecovers(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			fp := newFaultProxy(t, s.minioEndpoint)
+			fp := newFaultProxy(t, s.s3Endpoint)
 			c := s.client(t, "source", fp.URL(), tt.rateLimit, 2)
 
 			fp.failAll(http.StatusGatewayTimeout, true)
@@ -200,8 +200,8 @@ func TestDestinationDegradesIndependently(t *testing.T) {
 	s := newStack(t)
 	keys := s.seed(t, "indep-src", 1)
 
-	dstProxy := newFaultProxy(t, s.minioEndpoint)
-	src := s.client(t, "source", s.minioEndpoint, 100, 2)
+	dstProxy := newFaultProxy(t, s.s3Endpoint)
+	src := s.client(t, "source", s.s3Endpoint, 100, 2)
 	dst := s.client(t, "destination", dstProxy.URL(), 40, 2)
 
 	dstProxy.failAll(http.StatusGatewayTimeout, true)
@@ -298,8 +298,8 @@ func TestBurnAfterReadingVerifiesContentNotJustSize(t *testing.T) {
 	const bucket = "bar-src"
 	const dstBucket = "bar-dst"
 
-	src := s.client(t, "source", s.minioEndpoint, 0, 0)
-	dst := s.client(t, "destination", s.minioEndpoint, 0, 0)
+	src := s.client(t, "source", s.s3Endpoint, 0, 0)
+	dst := s.client(t, "destination", s.s3Endpoint, 0, 0)
 
 	if err := src.EnsureBucket(ctx, bucket); err != nil {
 		t.Fatalf("ensure source bucket: %v", err)

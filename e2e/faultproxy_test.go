@@ -46,7 +46,7 @@ func newFaultProxy(t *testing.T, upstream string) *faultProxy {
 			req.URL.Host = target.Host
 			// Host is deliberately left as the client sent it: SigV4 signs the
 			// Host header, so rewriting it would invalidate every signature.
-			// MinIO accepts a foreign Host under path-style addressing.
+			// Silo (like MinIO) accepts a foreign Host under path-style addressing.
 		},
 	}
 
