@@ -1,7 +1,8 @@
 # End-to-end resilience tests
 
 Container-backed tests that exercise tranquila's failure handling against a real
-MinIO, with real fault injection — the behaviour the unit tests can only
+S3-compatible server ([Silo](https://github.com/pgsty/silo), a maintained MinIO
+fork), with real fault injection — the behaviour the unit tests can only
 approximate with synthetic errors.
 
 - [Quick start](#quick-start)
@@ -23,7 +24,7 @@ go test ./...
 ```
 
 Expect roughly 3–4 minutes, and about 230 MB of image pulls on the first run
-(MinIO 168 MB, Redis 40 MB, Toxiproxy 18 MB, Ryuk 2 MB). No environment
+(Silo 153 MB, Redis 40 MB, Toxiproxy 18 MB, Ryuk 2 MB). No environment
 variables need to be set: `TestMain` configures the runtime itself.
 
 ```shell
@@ -34,8 +35,8 @@ go test -short ./...                          # skip all container tests
 ```
 
 Requirements: Go ≥ 1.25 (as declared in `e2e/go.mod`), a container runtime
-(below), and outbound access to `quay.io`, `ghcr.io` and `docker.io`. Four
-containers run concurrently — MinIO, Redis, Toxiproxy and Ryuk — so a podman
+(below), and outbound access to `ghcr.io` and `docker.io`. Four
+containers run concurrently — Silo, Redis, Toxiproxy and Ryuk — so a podman
 machine at the 2048 MiB default is tight; 4096 MiB is comfortable.
 
 If no runtime is reachable the tests **skip** with an explanation rather than
@@ -144,7 +145,7 @@ Useful escape hatches:
 | Variable | Effect |
 | --- | --- |
 | `TESTCONTAINERS_RYUK_DISABLED=true` | Skip the reaper entirely. Cleanup is also registered explicitly via `t.Cleanup`, so the suite does not depend on Ryuk. |
-| `TESTCONTAINERS_HUB_IMAGE_NAME_PREFIX` | Pull Docker Hub images through a mirror. Affects Redis and Ryuk only — MinIO comes from `quay.io` and Toxiproxy from `ghcr.io`. |
+| `TESTCONTAINERS_HUB_IMAGE_NAME_PREFIX` | Pull Docker Hub images through a mirror. Affects Silo, Redis and Ryuk — Toxiproxy comes from `ghcr.io`. |
 
 These four, plus `TESTCONTAINERS_SESSION_ID`, are the complete set testcontainers-go
 v0.44.0 reads.
@@ -174,9 +175,15 @@ not contain that substring and so silently leaves the Docker provider selected.
 
 **`no image found in image index for architecture "arm64"`**
 
-An amd64-only image tag on Apple Silicon. The MinIO community image publishes
-arm64 only on plain `RELEASE.*` tags; the enterprise `RELEASE.*.hotfix.*` tags
-are amd64-only. Keep the pinned tags in `harness_test.go`.
+An amd64-only image tag on Apple Silicon. Silo publishes per-arch tags
+(`RELEASE.*-amd64`, `RELEASE.*-arm64`) next to the multi-arch `RELEASE.*` one;
+pin the plain `RELEASE.*` tag. Keep the pinned tags in `harness_test.go`.
+
+**`start silo: ... unauthorized: access to the requested resource is not authorized`**
+
+A stale pin to `quay.io/minio/minio`. MinIO ended community image distribution
+and that repository now answers 401 to anonymous pulls — which is what broke this
+suite in CI and prompted the switch to Silo.
 
 **Tests skip with "no container runtime"**
 
@@ -192,7 +199,7 @@ to *every* project on the machine and can mask breakage — prefer the env var.
 
 **Leftover containers after an interrupted run**
 
-Each test starts its own MinIO + Redis + Toxiproxy stack and removes it via
+Each test starts its own Silo + Redis + Toxiproxy stack and removes it via
 `t.Cleanup`. A run killed with `SIGKILL` (or `kill -9`) skips those cleanups and
 leaves the stack behind — Ryuk reaps such orphans by session label, but not
 instantly. Orphans are easy to mistake for a hung run, since `podman ps` shows
@@ -206,7 +213,7 @@ podman ps --format '{{.Names}} {{.Image}} {{.Status}}'
 To clear them by hand:
 
 ```shell
-podman ps -q --filter ancestor=quay.io/minio/minio:RELEASE.2025-09-07T16-13-09Z \
+podman ps -q --filter ancestor=docker.io/pgsty/silo:RELEASE.2026-09-16T00-00-00Z \
   | xargs -r podman rm -f
 ```
 
@@ -294,8 +301,8 @@ Toxiproxy still earns its place for the orthogonal L4 faults an L7 proxy cannot
 produce, such as a mid-stream connection reset.
 
 The proxy leaves the `Host` header exactly as the client sent it: SigV4 signs
-that header, so rewriting it would invalidate every signature. MinIO accepts a
-foreign `Host` under path-style addressing.
+that header, so rewriting it would invalidate every signature. Silo, like MinIO,
+accepts a foreign `Host` under path-style addressing.
 
 ### Why assertions use HeadObject
 
@@ -318,6 +325,6 @@ the same tags work on an Apple Silicon laptop and an x86 CI runner:
 
 | Image | Note |
 | --- | --- |
-| `quay.io/minio/minio:RELEASE.2025-09-07T16-13-09Z` | Plain `RELEASE.*` tags only — `*.hotfix.*` tags are amd64-only. |
+| `docker.io/pgsty/silo:RELEASE.2026-09-16T00-00-00Z` | Maintained MinIO fork; keeps `MINIO_*` env vars and `/minio/*` routes. Plain `RELEASE.*` tag is multi-arch; `-amd64`/`-arm64`/`-distroless` suffixes are not what you want here. |
 | `ghcr.io/shopify/toxiproxy:2.12.0` | Use ghcr, not Docker Hub: `docker.io/shopify/toxiproxy` is stale at 2.1.4 and amd64-only. |
 | `redis:7-alpine` | |

@@ -23,7 +23,7 @@ func TestHarnessSmoke(t *testing.T) {
 	keys := s.seed(t, "smoke-src", 3)
 
 	t.Run("sigv4_survives_reverse_proxy", func(t *testing.T) {
-		fp := newFaultProxy(t, s.minioEndpoint)
+		fp := newFaultProxy(t, s.s3Endpoint)
 		c := s.client(t, "source", fp.URL(), 0, 0)
 		count, _, err := c.ListObjectsPage(ctx, "smoke-src", "", nil, 100, func([]storage.Object) error { return nil })
 		if err != nil {
@@ -53,7 +53,7 @@ func TestHarnessSmoke(t *testing.T) {
 	}
 	for _, tc := range classCases {
 		t.Run("classify_"+tc.name, func(t *testing.T) {
-			fp := newFaultProxy(t, s.minioEndpoint)
+			fp := newFaultProxy(t, s.s3Endpoint)
 			c := s.client(t, "source", fp.URL(), 0, 0)
 			fp.failAll(tc.status, tc.xmlBody)
 
@@ -68,7 +68,7 @@ func TestHarnessSmoke(t *testing.T) {
 	}
 
 	t.Run("retry_absorbs_a_transient_burst", func(t *testing.T) {
-		fp := newFaultProxy(t, s.minioEndpoint)
+		fp := newFaultProxy(t, s.s3Endpoint)
 		c := s.client(t, "source", fp.URL(), 0, 0)
 		// Fewer failures than the SDK's attempt budget, so the call must succeed.
 		fp.failNext(2, http.StatusGatewayTimeout, true)
