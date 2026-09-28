@@ -39,6 +39,17 @@
         "SCANNER_IMAGE:\\s+(?<depName>[^\\s:@]+):(?<currentValue>[^\\s@]+)@(?<currentDigest>sha256:[0-9a-f]+)"
       ],
       "datasourceTemplate": "docker"
+    },
+    {
+      "description": "The e2e fixture's pinned images are Go string consts in e2e/harness_test.go, which no built-in manager reads, so they only moved when bumped by hand. Only the exact-version pins are matched: redisImage and the kvEngines valkey entries float within a deliberately chosen major line (the state layer's compatibility matrix), and tracking them would propose majors that change what the matrix means.",
+      "customType": "regex",
+      "managerFilePatterns": [
+        "/^e2e/harness_test\\.go$/"
+      ],
+      "matchStrings": [
+        "(?:silo|toxiproxy)Image\\s*=\\s*\"(?<depName>[^\":]+):(?<currentValue>[^\"]+)\""
+      ],
+      "datasourceTemplate": "docker"
     }
   ],
   "packageRules": [
@@ -132,6 +143,17 @@
       "versioning": "docker",
       "automerge": true,
       "minimumReleaseAge": "0"
+    },
+    {
+      "description": "Silo tags are RELEASE timestamps (RELEASE.2026-09-16T00-00-00Z), which docker versioning cannot order, and each release also ships -amd64/-arm64/-distroless variants. The anchored regex both orders releases and restricts updates to the plain multi-arch tag the fixture needs on Apple Silicon and x86 CI alike. Must come after the catch-all docker rule, which would otherwise reset versioning.",
+      "matchDatasources": [
+        "docker"
+      ],
+      "matchPackageNames": [
+        "docker.io/pgsty/silo",
+        "pgsty/silo"
+      ],
+      "versioning": "regex:^RELEASE\\.(?<major>\\d{4})-(?<minor>\\d{2})-(?<patch>\\d{2})T\\d{2}-\\d{2}-\\d{2}Z$"
     },
     {
       "description": "Actions are pinned to a commit sha. Since the CI rework these push images to GHCR and sign with this repository's OIDC identity, so automerge waits on CI (see the removal of ignoreTests).",
