@@ -414,3 +414,30 @@ func TestDiscoveryCheckpointDefaults(t *testing.T) {
 		t.Errorf("DiscoveryCheckpointTTL = %v, want %v", sync.DiscoveryCheckpointTTL, want)
 	}
 }
+
+func TestSyncCmdValidatesWorkers(t *testing.T) {
+	tests := []struct {
+		name    string
+		args    []string
+		env     string
+		wantErr bool
+	}{
+		{name: "default", args: []string{"sync"}},
+		{name: "one", args: []string{"sync", "--workers=1"}},
+		{name: "zero hangs the pool", args: []string{"sync", "--workers=0"}, wantErr: true},
+		{name: "negative panics makechan", args: []string{"sync", "--workers=-1"}, wantErr: true},
+		{name: "negative via env", args: []string{"sync"}, env: "-1", wantErr: true},
+	}
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			if tc.env != "" {
+				t.Setenv("TRANQUILA_WORKERS", tc.env)
+			}
+			parser := buildParser(&CLI{})
+			_, err := parser.Parse(tc.args)
+			if (err != nil) != tc.wantErr {
+				t.Fatalf("Parse(%v) err = %v, wantErr %v", tc.args, err, tc.wantErr)
+			}
+		})
+	}
+}

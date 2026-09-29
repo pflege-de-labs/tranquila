@@ -98,6 +98,15 @@ func endpointState(st storage.LimitState) api.EndpointState {
 	return es
 }
 
+// Validate is called by kong after parsing, before Run. Workers sizes buffered
+// channels, so a negative value panics the process and zero hangs it forever.
+func (cmd *SyncCmd) Validate() error {
+	if cmd.Workers < 1 {
+		return fmt.Errorf("--workers must be at least 1, got %d", cmd.Workers)
+	}
+	return nil
+}
+
 // resolveBuckets merges --bucket-mappings, --prefix-mappings, and --bucket-mapping-file
 // into a per-source-bucket config. The mapping file may contain both bucket-mapping lines
 // ("name" or "src=dst") and prefix-mapping lines ("bucket/src-prefix[=dst-prefix]") —
