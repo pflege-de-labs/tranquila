@@ -141,6 +141,14 @@ func TestSQSWatcher(t *testing.T) {
 		wantDeletedN int
 	}{
 		{
+			name: "encoded key is decoded",
+			messages: []types.Message{
+				{Body: aws.String(sqsBody("my-bucket", "dir/a+b%2Bc.txt", 7)), ReceiptHandle: aws.String("rh1")},
+			},
+			wantEvents:   []ObjectEvent{{Bucket: "my-bucket", Key: "dir/a b+c.txt", Size: 7}},
+			wantDeletedN: 1,
+		},
+		{
 			name: "valid event emitted and message deleted",
 			messages: []types.Message{
 				{Body: aws.String(sqsBody("my-bucket", "dir/file.txt", 1024)), ReceiptHandle: aws.String("rh1")},
