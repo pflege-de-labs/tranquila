@@ -683,15 +683,22 @@ A branch with no open pull request produces no image; run the CI workflow manual
 
 ### Verifying a release
 
-Images are signed with cosign using the workflow's own identity — there is no public key to
-distribute:
+Images are signed with cosign using the identity of the workflow that built them — there is no
+public key to distribute. They are built by the shared
+[pflege-de-labs/github-workflows](https://github.com/pflege-de-labs/github-workflows), so the
+certificate names that workflow, and the workflow-repository claim names tranquila:
 
 ```bash
 cosign verify \
-  --certificate-identity-regexp '^https://github.com/pflege-de-labs/tranquila/' \
+  --certificate-identity-regexp '^https://github\.com/pflege-de-labs/github-workflows/\.github/workflows/image-release\.yml@' \
+  --certificate-github-workflow-repository pflege-de-labs/tranquila \
   --certificate-oidc-issuer https://token.actions.githubusercontent.com \
   ghcr.io/pflege-de-labs/tranquila:1.2.3
 ```
+
+> Releases built before the move to the shared workflows were signed by this repository's own
+> workflow. Verify those with `--certificate-identity-regexp '^https://github.com/pflege-de-labs/tranquila/'`
+> in place of the two certificate options above ([ADR 0008](docs/adr/0008-shared-workflows.md)).
 
 > Signing and attestations start with the first release built by this pipeline. Images for
 > `0.4.3` and earlier were built before it existed and carry **no** signature — `cosign verify`
@@ -723,7 +730,8 @@ binaries and their SBOMs:
 ```bash
 cosign verify-blob \
   --bundle checksums.txt.bundle \
-  --certificate-identity-regexp '^https://github.com/pflege-de-labs/tranquila/' \
+  --certificate-identity-regexp '^https://github\.com/pflege-de-labs/github-workflows/\.github/workflows/go-binaries\.yml@' \
+  --certificate-github-workflow-repository pflege-de-labs/tranquila \
   --certificate-oidc-issuer https://token.actions.githubusercontent.com \
   checksums.txt
 sha256sum -c checksums.txt
@@ -732,7 +740,8 @@ sha256sum -c checksums.txt
 Binaries are published for `linux` and `darwin` on `amd64` and `arm64`.
 
 The full rationale for this pipeline is in
-[docs/adr/0001-ci-cd-pipeline.md](docs/adr/0001-ci-cd-pipeline.md).
+[docs/adr/0001-ci-cd-pipeline.md](docs/adr/0001-ci-cd-pipeline.md), and how it runs on the shared
+workflows in [docs/adr/0008-shared-workflows.md](docs/adr/0008-shared-workflows.md).
 
 ## Tests
 
