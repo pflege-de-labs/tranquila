@@ -1,6 +1,6 @@
 # 0007. Upload a bare SPDX document per platform, and stop letting SecObserve gate a release
 
-* Status: Accepted
+* Status: Accepted, amended by [0008](0008-shared-workflows.md)
 * Date: 2026-09-16
 * Supersedes [0006](0006-secobserve-image-scanning.md)
 

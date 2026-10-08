@@ -1,0 +1,38 @@
+name: End-to-end
+
+# Called by ci.yml and release.yml, so the e2e invocation cannot drift between them. The shared
+# go-checks workflow cannot run it: the suite lives in a nested module and needs a container runtime.
+on:
+  workflow_call:
+
+permissions:
+  contents: read
+
+jobs:
+  e2e:
+    name: End-to-End (Silo + Toxiproxy)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+
+      - name: Set up Go
+        uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7
+        with:
+          go-version: stable
+
+      # go does not descend into nested modules, so the root module's vet never reaches e2e.
+      - name: Vet e2e module
+        working-directory: e2e
+        run: go vet ./...
+
+      # The suite skips rather than fails when it finds no runtime, so without
+      # this a runner without Docker would turn the gate into a green no-op.
+      - name: Fail fast if no container runtime is reachable
+        run: docker info > /dev/null
+
+      # Docker is preinstalled on ubuntu-latest and testcontainers finds
+      # /var/run/docker.sock unaided, so no runtime setup is needed here. The
+      # podman handling in e2e/runtime_test.go is inert on this runner.
+      - name: Run end-to-end tests
+        working-directory: e2e
+        run: go test -v -timeout 30m ./...

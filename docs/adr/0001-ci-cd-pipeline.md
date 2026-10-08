@@ -1,6 +1,6 @@
 # 0001. Images are tagged by metadata-action, releases rebuild and are signed
 
-* Status: Accepted
+* Status: Accepted, amended by [0008](0008-shared-workflows.md)
 * Date: 2026-09-11
 
 ## Context

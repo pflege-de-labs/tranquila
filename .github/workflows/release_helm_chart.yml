@@ -16,31 +16,8 @@ permissions:
 
 jobs:
   release:
-    runs-on: ubuntu-latest
+    uses: pflege-de-labs/github-workflows/.github/workflows/helm-release.yml@d5b9ce5cc098cf3239e796f49d742a48140130c0 # v1.0.0
     permissions:
       contents: write
       packages: write
-    steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
-        with:
-          fetch-depth: 0
-
-      # chart-releaser tags and pushes, so it needs an identity.
-      - name: Configure git
-        run: |
-          git config user.name "${{ github.actor }}"
-          git config user.email "${{ github.actor }}@users.noreply.github.com"
-
-      # The registry path has to be lowercase, the owner does not have to be.
-      - name: Downcase the repository owner
-        run: echo "REPO_OWNER=$(echo '${{ github.repository_owner }}' | tr '[:upper:]' '[:lower:]')" >> "$GITHUB_ENV"
-
-      - uses: bitdeps/helm-oci-charts-releaser@caedceea2a5ab997c7e5469a999811dbb3d5b070 # v0.1.5
-        with:
-          version: v4.2.3
-          charts_dir: charts
-          oci_registry: ghcr.io/${{ env.REPO_OWNER }}/charts
-          oci_username: ${{ github.actor }}
-          oci_password: ${{ secrets.GITHUB_TOKEN }}
-          github_token: ${{ secrets.GITHUB_TOKEN }}
-          skip_gh_release: false
+      id-token: write

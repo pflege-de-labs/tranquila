@@ -113,7 +113,7 @@ Rootless Podman is untested here; if Ryuk misbehaves, see
 
 GitHub Actions `ubuntu-latest` needs nothing: Docker is preinstalled at
 `/var/run/docker.sock` and the podman handling is inert. The `e2e` job in
-`.github/workflows/ci.yml` is simply:
+`.github/workflows/e2e.yml`, which CI and the release both call, is simply:
 
 ```yaml
 - name: Run end-to-end tests
