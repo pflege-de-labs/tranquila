@@ -536,6 +536,7 @@ tranquila sync --telemetry-exporter=otlp --telemetry-otlp-endpoint=localhost:431
 | ---------------------------------- | --------------- | --------------------- | -------------------------------------------------- |
 | `tranquila.objects.synced`         | Counter         | `bucket`              | Objects successfully copied                        |
 | `tranquila.objects.failed`         | Counter         | `bucket`              | Objects that failed to copy                        |
+| `tranquila.panics.recovered`       | Counter         | `site`                | Panics recovered per job (`transfer`), prefix (`list_prefix`) or bucket (`discovery`); see ADR 0009 |
 | `tranquila.bytes.transferred`      | Counter         | `bucket`              | Bytes transferred                                  |
 | `tranquila.transfer.duration`      | Histogram (s)   | `bucket`              | Per-object transfer duration                       |
 | `tranquila.workers.active`         | UpDownCounter   | —                     | Workers currently executing a transfer             |

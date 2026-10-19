@@ -18,6 +18,7 @@ import (
 	tmtypes "github.com/aws/aws-sdk-go-v2/feature/s3/transfermanager/types"
 	"github.com/aws/aws-sdk-go-v2/service/s3"
 	s3types "github.com/aws/aws-sdk-go-v2/service/s3/types"
+	"github.com/pflege-de-labs/tranquila/internal/recovery"
 	"github.com/rs/zerolog/log"
 	"go.opentelemetry.io/otel/attribute"
 	"go.opentelemetry.io/otel/metric"
@@ -894,6 +895,12 @@ func listObjectsTree(ctx context.Context, bucket, rootPrefix string, list listDe
 	// loop, and double-release the slot on the next iteration).
 	processOne := func(prefix string) {
 		defer wg.Done()
+		// A panic abandons this prefix like a listing failure, not the walk.
+		defer func() {
+			if r := recover(); r != nil {
+				addPrefixErr(recovery.Handle("list_prefix", r, log.With().Str("bucket", bucket).Str("prefix", prefix).Logger()))
+			}
+		}()
 
 		var token *string
 		// dirty: this prefix may have a stored checkpoint, so a terminal event

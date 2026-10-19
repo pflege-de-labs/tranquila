@@ -5,6 +5,8 @@ import (
 	"sync"
 	"time"
 
+	"github.com/pflege-de-labs/tranquila/internal/recovery"
+	"github.com/rs/zerolog/log"
 	"go.opentelemetry.io/otel/metric"
 )
 
@@ -89,11 +91,22 @@ func (p *workerPool) runWorker(ctx context.Context, fn transferFn) {
 		// transfer past terminationGracePeriodSeconds.
 		start := time.Now()
 		transferCtx, cancelTransfer := context.WithTimeout(context.WithoutCancel(ctx), transferGrace)
-		err := fn(transferCtx, job)
+		err := runJob(transferCtx, fn, job)
 		cancelTransfer()
 		p.activeWorkers.Add(context.Background(), -1)
 		p.results <- Result{Job: job, Duration: time.Since(start), Err: err}
 	}
+}
+
+// runJob turns a panic into the job's error, so processResults still marks it
+// failed and calls OnComplete (releasing bucketSem and the batch WaitGroup).
+func runJob(ctx context.Context, fn transferFn, job Job) (err error) {
+	defer func() {
+		if r := recover(); r != nil {
+			err = recovery.Handle("transfer", r, log.With().Str("bucket", job.SrcBucket).Str("key", job.Key).Logger())
+		}
+	}()
+	return fn(ctx, job)
 }
 
 func (p *workerPool) submit(job Job) {
