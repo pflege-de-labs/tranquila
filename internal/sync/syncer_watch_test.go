@@ -289,6 +289,24 @@ func TestEventDispatch(t *testing.T) {
 			bc:    BucketConfig{PropagateDeletes: false},
 			want:  dispatchSkipDelete,
 		},
+		{
+			name:  "created_event_inside_prefix_is_upload",
+			event: watcher.ObjectEvent{Key: "2026/1/5/a.json"},
+			bc:    BucketConfig{SrcPrefix: "2026/1"},
+			want:  dispatchUpload,
+		},
+		{
+			name:  "created_event_outside_prefix_is_ignored",
+			event: watcher.ObjectEvent{Key: "2026/2/10/fo.json"},
+			bc:    BucketConfig{SrcPrefix: "2026/1/"},
+			want:  dispatchOutOfPrefix,
+		},
+		{
+			name:  "delete_event_outside_prefix_is_ignored_even_with_propagate",
+			event: watcher.ObjectEvent{Key: "other/x", IsDelete: true},
+			bc:    BucketConfig{SrcPrefix: "2026/", PropagateDeletes: true},
+			want:  dispatchOutOfPrefix,
+		},
 	}
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {

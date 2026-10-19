@@ -32,7 +32,7 @@ Three backends selected via `--watch-mode`:
 | `minio` | — | `minio-go/v7` `ListenBucketNotification` SSE stream. Reuses source credentials. |
 | `sqs` | `--sqs-queue-url` | `aws-sdk-go-v2/service/sqs` long-poll. User pre-configures S3→SQS notification. |
 
-Event-driven modes (`minio`, `sqs`) run an initial full `Run()` on startup to catch missed changes, then switch to event-driven.
+Event-driven modes (`minio`, `sqs`) run an initial full `Run()` on startup to catch missed changes, then switch to event-driven. `eventDispatch` drops events whose key lacks `SrcPrefix` (`dispatchOutOfPrefix`): both watchers subscribe bucket-wide, so without it watch mode synced — and with propagate-deletes, deleted — keys poll-mode discovery never lists.
 
 Key design: provider-agnostic — polling works everywhere; push modes are opt-in per backend. No SQS/SNS assumption for non-AWS endpoints.
 
