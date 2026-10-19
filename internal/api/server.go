@@ -54,9 +54,9 @@ func NewServer(cfg Config) *Server {
 	mux := http.NewServeMux()
 	mux.HandleFunc("GET /healthz", s.healthz)
 	mux.HandleFunc("GET /readyz", s.readyz)
-	mux.HandleFunc("GET /api/v1/buckets", s.listBuckets)
-	mux.HandleFunc("GET /api/v1/buckets/{name}", s.getBucket)
-	mux.HandleFunc("GET /api/v1/sync", s.getSyncStatus)
+	mux.HandleFunc("GET /api/v1/buckets", s.requireDeps(s.listBuckets))
+	mux.HandleFunc("GET /api/v1/buckets/{name}", s.requireDeps(s.getBucket))
+	mux.HandleFunc("GET /api/v1/sync", s.requireDeps(s.getSyncStatus))
 	s.srv = &http.Server{
 		Addr:    cfg.Addr,
 		Handler: mux,
@@ -190,6 +190,18 @@ func (s *Server) bucketStatus(ctx context.Context, name string, snap internalsyn
 	}
 
 	return bs, nil
+}
+
+// requireDeps answers 503 instead of dereferencing a nil State/Progress; probe
+// tests construct a Server without them on purpose.
+func (s *Server) requireDeps(h http.HandlerFunc) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		if s.state == nil || s.progress == nil {
+			writeJSON(w, http.StatusServiceUnavailable, apiError{Error: "state store not configured"})
+			return
+		}
+		h(w, r)
+	}
 }
 
 // ── handlers ─────────────────────────────────────────────────────────────────
