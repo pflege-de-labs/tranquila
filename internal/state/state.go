@@ -315,6 +315,10 @@ func (s *Store) ScanStaleObjects(ctx context.Context, bucket string, before time
 		}
 		for j, cmd := range cmds {
 			vals := cmd.Val()
+			// Short only if the command failed; guard so tolerating per-command errors later cannot panic.
+			if len(vals) < 2 {
+				continue
+			}
 			status, _ := vals[0].(string)
 			if status != StatusSynced {
 				continue
@@ -380,6 +384,10 @@ func (s *Store) ScanAgedSyncedObjects(ctx context.Context, bucket string, before
 		}
 		for j, cmd := range cmds {
 			vals := cmd.Val()
+			// Short only if the command failed; guard so tolerating per-command errors later cannot panic.
+			if len(vals) < 2 {
+				continue
+			}
 			status, _ := vals[0].(string)
 			if status != StatusSynced {
 				continue

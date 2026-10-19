@@ -101,3 +101,20 @@ func TestProbeRoutesRegistered(t *testing.T) {
 		}
 	}
 }
+
+func TestDataRoutesWithoutStateReturn503(t *testing.T) {
+	s := NewServer(Config{Addr: ":0"})
+	srv := httptest.NewServer(s.srv.Handler)
+	defer srv.Close()
+
+	for _, path := range []string{"/api/v1/buckets", "/api/v1/buckets/foo", "/api/v1/sync"} {
+		resp, err := http.Get(srv.URL + path)
+		if err != nil {
+			t.Fatalf("GET %s: %v", path, err)
+		}
+		resp.Body.Close()
+		if resp.StatusCode != http.StatusServiceUnavailable {
+			t.Fatalf("GET %s status = %d, want %d", path, resp.StatusCode, http.StatusServiceUnavailable)
+		}
+	}
+}
