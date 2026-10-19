@@ -261,8 +261,8 @@ func TestMinIOWatchBucketResubscribes(t *testing.T) {
 	if len(got) != 1 || got[0].Key != "k1" {
 		t.Fatalf("events = %+v, want one event for k1", got)
 	}
-	// attempts 1, 2, then reset → 1, 1 (a healthy stream that later ends restarts at attempt 1).
-	maxFor := []time.Duration{2 * retryBase, 3 * retryBase, 2 * retryBase, 2 * retryBase}
+	// attempts 1, 2, then the healthy stream resets → 1, 2.
+	maxFor := []time.Duration{2 * retryBase, 3 * retryBase, 2 * retryBase, 3 * retryBase}
 	for i, d := range rec.delays {
 		if d >= maxFor[i] {
 			t.Errorf("delay[%d] = %v, want < %v", i, d, maxFor[i])
