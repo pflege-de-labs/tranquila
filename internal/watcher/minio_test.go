@@ -155,7 +155,7 @@ func TestMinIOWatchBucket(t *testing.T) {
 
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
-			w := &MinIOWatcher{client: &fakeMinIONotifier{infos: tc.infos}}
+			w := &MinIOWatcher{client: &fakeMinIONotifier{infos: tc.infos}, sleep: noRetry}
 			out := make(chan ObjectEvent, 100)
 			w.watchBucket(context.Background(), "b1", out)
 			close(out)
@@ -181,7 +181,7 @@ func TestMinIOWatchMultipleBuckets(t *testing.T) {
 	buckets := []string{"b1", "b2"}
 	w := &MinIOWatcher{client: &fakeMinIONotifier{
 		infos: []notification.Info{makeNotifyInfo("bucket", "k", 10)},
-	}}
+	}, sleep: noRetry}
 
 	ctx, cancel := context.WithTimeout(context.Background(), time.Second)
 	defer cancel()
@@ -219,5 +219,64 @@ func TestMinIOWatchContextCancel(t *testing.T) {
 		}
 	case <-time.After(time.Second):
 		t.Error("channel did not close after context cancel")
+	}
+}
+
+// flakyMinIONotifier closes streams[i] on the ith subscription, then blocks.
+type flakyMinIONotifier struct {
+	streams [][]notification.Info
+	subs    int
+}
+
+func (f *flakyMinIONotifier) ListenBucketNotification(ctx context.Context, _, _, _ string, _ []string) <-chan notification.Info {
+	i := f.subs
+	f.subs++
+	if i >= len(f.streams) {
+		return (&fakeMinIONotifier{block: true}).ListenBucketNotification(ctx, "", "", "", nil)
+	}
+	return (&fakeMinIONotifier{infos: f.streams[i]}).ListenBucketNotification(ctx, "", "", "", nil)
+}
+
+func TestMinIOWatchBucketResubscribes(t *testing.T) {
+	failed := notification.Info{Err: errors.New("connection refused")}
+	fake := &flakyMinIONotifier{streams: [][]notification.Info{
+		{failed},
+		{failed},
+		{makeNotifyInfo("b1", "k1", 1)}, // healthy stream resets the backoff
+		{failed},
+	}}
+	rec := &recordingSleeper{limit: 4}
+	w := &MinIOWatcher{client: fake, sleep: rec.sleep}
+	out := make(chan ObjectEvent, 10)
+	w.watchBucket(context.Background(), "b1", out)
+	close(out)
+
+	if fake.subs != 4 {
+		t.Fatalf("subscriptions = %d, want 4", fake.subs)
+	}
+	var got []ObjectEvent
+	for e := range out {
+		got = append(got, e)
+	}
+	if len(got) != 1 || got[0].Key != "k1" {
+		t.Fatalf("events = %+v, want one event for k1", got)
+	}
+	// attempts 1, 2, then the healthy stream resets → 1, 2.
+	maxFor := []time.Duration{2 * retryBase, 3 * retryBase, 2 * retryBase, 3 * retryBase}
+	for i, d := range rec.delays {
+		if d >= maxFor[i] {
+			t.Errorf("delay[%d] = %v, want < %v", i, d, maxFor[i])
+		}
+	}
+}
+
+func TestMinIOWatchBucketStopsOnCancel(t *testing.T) {
+	ctx, cancel := context.WithCancel(context.Background())
+	cancel()
+	rec := &recordingSleeper{limit: 100}
+	w := &MinIOWatcher{client: &fakeMinIONotifier{}, sleep: rec.sleep}
+	w.watchBucket(ctx, "b1", make(chan ObjectEvent, 1))
+	if len(rec.delays) != 0 {
+		t.Errorf("slept %d times after cancel, want 0", len(rec.delays))
 	}
 }

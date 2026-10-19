@@ -32,6 +32,7 @@ type sqsClient interface {
 type SQSWatcher struct {
 	client   sqsClient
 	queueURL string
+	sleep    sleeper // nil = waitOrDone
 }
 
 // NewSQS creates an SQSWatcher that polls the given queue for S3 object events.
@@ -67,6 +68,13 @@ func (w *SQSWatcher) Watch(ctx context.Context, _ []string) (<-chan ObjectEvent,
 }
 
 func (w *SQSWatcher) poll(ctx context.Context, out chan<- ObjectEvent) {
+	sleep := w.sleep
+	if sleep == nil {
+		sleep = waitOrDone
+	}
+	// Non-retryable errors (AccessDenied, NonExistentQueue) return at once and
+	// would otherwise spin this loop at full speed.
+	failures := 0
 	for {
 		if ctx.Err() != nil {
 			return
@@ -80,9 +88,15 @@ func (w *SQSWatcher) poll(ctx context.Context, out chan<- ObjectEvent) {
 			if ctx.Err() != nil {
 				return
 			}
-			log.Warn().Err(err).Msg("sqs receive error")
+			failures++
+			delay := retryDelay(failures)
+			log.Warn().Err(err).Int("attempt", failures).Str("retry_in", delay.String()).Msg("sqs receive error")
+			if !sleep(ctx, delay) {
+				return
+			}
 			continue
 		}
+		failures = 0
 		for _, msg := range resp.Messages {
 			w.processMessage(ctx, msg.Body, msg.ReceiptHandle, out)
 		}
