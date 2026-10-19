@@ -86,6 +86,8 @@ Priority order (highest wins):
 3. YAML config file
 4. Built-in defaults
 
+A non-empty environment variable overrides the same key in the config file; an empty one does not.
+
 ### Config File
 
 Load with `--configFile <path>` (short: `-c`) or place a `tranquila.yaml` in the working directory. Tranquila also checks `~/.config/tranquila.yaml`.

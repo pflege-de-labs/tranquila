@@ -441,3 +441,47 @@ func TestSyncCmdValidatesWorkers(t *testing.T) {
 		})
 	}
 }
+
+// Flag > env > config file > default, as documented in the README.
+func TestEnvOverridesConflictingConfigFileValue(t *testing.T) {
+	clearSyncEnvVars(t)
+	t.Setenv("TRANQUILA_WORKERS", "3")
+	t.Setenv("SOURCE_ENDPOINT", "http://env:9000")
+	t.Setenv("REDIS_PASSWORD", "") // set but empty yields to the file
+
+	cfgPath := filepath.Join(t.TempDir(), "config.yaml")
+	yaml := "sync:\n  workers: 10\n  source:\n    endpoint: http://file:9000\n    region: eu-west-1\n  redis-password: filepw\n"
+	if err := os.WriteFile(cfgPath, []byte(yaml), 0600); err != nil {
+		t.Fatalf("write config: %v", err)
+	}
+
+	tests := []struct {
+		name         string
+		args         []string
+		wantWorkers  int
+		wantEndpoint string
+	}{
+		{name: "env beats file", args: []string{"sync"}, wantWorkers: 3, wantEndpoint: "http://env:9000"},
+		{name: "flag beats env", args: []string{"sync", "--workers=7"}, wantWorkers: 7, wantEndpoint: "http://env:9000"},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			cli := &CLI{}
+			if _, err := buildParser(cli, cfgPath).Parse(tt.args); err != nil {
+				t.Fatalf("parse: %v", err)
+			}
+			if cli.Sync.Workers != tt.wantWorkers {
+				t.Errorf("Workers = %d, want %d", cli.Sync.Workers, tt.wantWorkers)
+			}
+			if cli.Sync.Source.Endpoint != tt.wantEndpoint {
+				t.Errorf("Source.Endpoint = %q, want %q", cli.Sync.Source.Endpoint, tt.wantEndpoint)
+			}
+			if cli.Sync.RedisPassword != "filepw" {
+				t.Errorf("RedisPassword = %q, want file value over empty env", cli.Sync.RedisPassword)
+			}
+			if cli.Sync.Source.Region != "eu-west-1" {
+				t.Errorf("Source.Region = %q, want file value for key without env", cli.Sync.Source.Region)
+			}
+		})
+	}
+}

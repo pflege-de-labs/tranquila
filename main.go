@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"io"
 	"log/slog"
 	"os"
 	"path/filepath"
@@ -34,12 +35,37 @@ type CLI struct {
 // Exported for test reuse.
 func buildParser(cli *CLI, cfgPaths ...string) *kong.Kong {
 	return kong.Must(cli,
-		kong.Configuration(kongyaml.Loader, cfgPaths...),
+		kong.Configuration(envFirst(kongyaml.Loader), cfgPaths...),
 		kong.Name("tranquila"),
 		kong.Description("S3 bucket synchronization tool"),
 		kong.Vars{"version": version},
 		kong.ConfigureHelp(kong.HelpOptions{Compact: true}),
 	)
+}
+
+// envFirst makes config-file values yield to a set env var. kong applies env in
+// Value.Reset, before resolvers, so a plain file resolver would overwrite it.
+func envFirst(loader kong.ConfigurationLoader) kong.ConfigurationLoader {
+	return func(r io.Reader) (kong.Resolver, error) {
+		res, err := loader(r)
+		if err != nil {
+			return nil, err
+		}
+		return envFirstResolver{res}, nil
+	}
+}
+
+type envFirstResolver struct{ kong.Resolver }
+
+func (e envFirstResolver) Resolve(kctx *kong.Context, parent *kong.Path, flag *kong.Flag) (any, error) {
+	for _, env := range flag.Envs {
+		// Empty does not count: the chart injects REDIS_PASSWORD="" by default,
+		// which must not blank a value from an existingConfig file.
+		if os.Getenv(env) != "" {
+			return nil, nil
+		}
+	}
+	return e.Resolver.Resolve(kctx, parent, flag)
 }
 
 func main() {
