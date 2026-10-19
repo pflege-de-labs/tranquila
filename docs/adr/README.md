@@ -23,3 +23,4 @@ Architectural decisions are recorded here, one file per decision, in
 | [0006](0006-secobserve-image-scanning.md) | Images are scanned with Trivy and reported to SecObserve | Superseded by [0007](0007-secobserve-upload-correctness.md) |
 | [0007](0007-secobserve-upload-correctness.md) | Upload a bare SPDX document per platform, and stop letting SecObserve gate a release | Accepted, amended by [0008](0008-shared-workflows.md) |
 | [0008](0008-shared-workflows.md) | CI and release run on the shared pflege-de-labs workflows | Accepted |
+| [0009](0009-panic-recovery.md) | Recover panics per unit of work, not per process | Accepted |

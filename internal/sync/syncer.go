@@ -11,6 +11,7 @@ import (
 	"time"
 
 	"github.com/dustin/go-humanize"
+	"github.com/pflege-de-labs/tranquila/internal/recovery"
 	"github.com/pflege-de-labs/tranquila/internal/state"
 	"github.com/pflege-de-labs/tranquila/internal/storage"
 	"github.com/pflege-de-labs/tranquila/internal/watcher"
@@ -214,6 +215,12 @@ func (s *Syncer) Run(ctx context.Context) error {
 		go func(b string, cfg BucketConfig) {
 			defer discoverWg.Done()
 			defer func() { <-sem }()
+			// Covers onPage too: both discovery strategies call it on this goroutine.
+			defer func() {
+				if r := recover(); r != nil {
+					errc <- fmt.Errorf("bucket %s: %w", b, recovery.Handle("discovery", r, log.With().Str("bucket", b).Logger()))
+				}
+			}()
 			if err := s.discoverAndSyncBucket(ctx, b, cfg, collectionTime, pool); err != nil {
 				if !errors.Is(err, context.Canceled) {
 					errc <- fmt.Errorf("bucket %s: %w", b, err)
