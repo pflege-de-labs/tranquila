@@ -422,7 +422,7 @@ Enable with `--watch`. Three backends are available:
 | `minio` | —                                  | Subscribes to MinIO bucket notifications via SSE. Reuses source credentials.                            |
 | `sqs`   | `--sqs-queue-url`                  | Long-polls an SQS queue for S3 event notifications. Configure the S3->SQS notification externally.      |
 
-Event-driven backends (`minio`, `sqs`) run a full initial sync on startup to catch changes missed while the process was down, then switch to event-driven.
+Event-driven backends (`minio`, `sqs`) run a full initial sync on startup to catch changes missed while the process was down, then switch to event-driven. Events for keys outside a bucket's configured source `prefix` are ignored, so watch mode syncs the same scope as polling.
 
 ```shell
 # Poll every 5 minutes

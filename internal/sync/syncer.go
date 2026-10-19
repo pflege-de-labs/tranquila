@@ -544,15 +544,20 @@ func (s *Syncer) discoverSharded(ctx context.Context, bucket string, cfg BucketC
 type eventDecision int
 
 const (
-	dispatchUpload     eventDecision = iota // created/modified: sync as usual
-	dispatchDelete                          // removed + propagate-deletes enabled: delete destination
-	dispatchSkipDelete                      // removed but propagate-deletes disabled: ignore
+	dispatchUpload      eventDecision = iota // created/modified: sync as usual
+	dispatchDelete                           // removed + propagate-deletes enabled: delete destination
+	dispatchSkipDelete                       // removed but propagate-deletes disabled: ignore
+	dispatchOutOfPrefix                      // key outside SrcPrefix: ignore, as discovery never lists it
 )
 
 // eventDispatch decides how to handle a watcher event for its bucket, decoupled
 // from job submission so the routing logic is unit-testable without a live
 // worker pool.
 func eventDispatch(event watcher.ObjectEvent, bc BucketConfig) eventDecision {
+	// Watchers subscribe bucket-wide, so the prefix scope discovery applies must be enforced here.
+	if !strings.HasPrefix(event.Key, bc.SrcPrefix) {
+		return dispatchOutOfPrefix
+	}
 	if !event.IsDelete {
 		return dispatchUpload
 	}
@@ -1047,6 +1052,10 @@ func (s *Syncer) runWatcher(ctx context.Context, w watcher.Watcher, srcBuckets [
 		}
 
 		switch eventDispatch(event, bc) {
+		case dispatchOutOfPrefix:
+			log.Debug().Str("bucket", event.Bucket).Str("key", event.Key).Str("prefix", bc.SrcPrefix).
+				Msg("watch: event outside configured source prefix, ignoring")
+			continue
 		case dispatchSkipDelete:
 			log.Debug().Str("bucket", event.Bucket).Str("key", event.Key).
 				Msg("watch: source deletion event, propagate-deletes disabled for bucket, ignoring")
