@@ -59,8 +59,9 @@ type envFirstResolver struct{ kong.Resolver }
 
 func (e envFirstResolver) Resolve(kctx *kong.Context, parent *kong.Path, flag *kong.Flag) (any, error) {
 	for _, env := range flag.Envs {
-		// LookupEnv, not Getenv: kong treats a set-but-empty var as set.
-		if _, ok := os.LookupEnv(env); ok {
+		// Empty does not count: the chart injects REDIS_PASSWORD="" by default,
+		// which must not blank a value from an existingConfig file.
+		if os.Getenv(env) != "" {
 			return nil, nil
 		}
 	}

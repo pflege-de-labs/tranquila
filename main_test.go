@@ -447,7 +447,7 @@ func TestEnvOverridesConflictingConfigFileValue(t *testing.T) {
 	clearSyncEnvVars(t)
 	t.Setenv("TRANQUILA_WORKERS", "3")
 	t.Setenv("SOURCE_ENDPOINT", "http://env:9000")
-	t.Setenv("REDIS_PASSWORD", "") // set but empty still wins, like kong's own env handling
+	t.Setenv("REDIS_PASSWORD", "") // set but empty yields to the file
 
 	cfgPath := filepath.Join(t.TempDir(), "config.yaml")
 	yaml := "sync:\n  workers: 10\n  source:\n    endpoint: http://file:9000\n    region: eu-west-1\n  redis-password: filepw\n"
@@ -476,8 +476,8 @@ func TestEnvOverridesConflictingConfigFileValue(t *testing.T) {
 			if cli.Sync.Source.Endpoint != tt.wantEndpoint {
 				t.Errorf("Source.Endpoint = %q, want %q", cli.Sync.Source.Endpoint, tt.wantEndpoint)
 			}
-			if cli.Sync.RedisPassword != "" {
-				t.Errorf("RedisPassword = %q, want empty env value", cli.Sync.RedisPassword)
+			if cli.Sync.RedisPassword != "filepw" {
+				t.Errorf("RedisPassword = %q, want file value over empty env", cli.Sync.RedisPassword)
 			}
 			if cli.Sync.Source.Region != "eu-west-1" {
 				t.Errorf("Source.Region = %q, want file value for key without env", cli.Sync.Source.Region)

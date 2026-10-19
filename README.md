@@ -86,7 +86,7 @@ Priority order (highest wins):
 3. YAML config file
 4. Built-in defaults
 
-An environment variable that is set — even to an empty string — overrides the same key in the config file.
+A non-empty environment variable overrides the same key in the config file; an empty one does not.
 
 ### Config File
 
