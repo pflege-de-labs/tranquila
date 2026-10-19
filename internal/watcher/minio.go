@@ -29,6 +29,7 @@ type minioNotifier interface {
 // MinIOWatcher subscribes to MinIO's ListenBucketNotification SSE stream.
 type MinIOWatcher struct {
 	client minioNotifier
+	sleep  sleeper // nil = waitOrDone
 }
 
 // NewMinIO creates a MinIOWatcher using ListenBucketNotification for real-time events.
@@ -76,13 +77,41 @@ func (w *MinIOWatcher) watchBucket(ctx context.Context, bucket string, out chan<
 		string(notification.ObjectCreatedAll),
 		string(notification.ObjectRemovedAll),
 	}
-	ch := w.client.ListenBucketNotification(ctx, bucket, "", "", events)
+	sleep := w.sleep
+	if sleep == nil {
+		sleep = waitOrDone
+	}
+	// minio-go closes the stream after a failed request or non-200 instead of
+	// retrying, so resubscribe or this bucket silently stops receiving events.
+	failures := 0
+	for {
+		if w.drain(bucket, w.client.ListenBucketNotification(ctx, bucket, "", "", events), out) {
+			failures = 0
+		}
+		if ctx.Err() != nil {
+			return
+		}
+		failures++
+		delay := retryDelay(failures)
+		log.Warn().Str("bucket", bucket).Int("attempt", failures).Str("retry_in", delay.String()).
+			Msg("minio notification stream ended, resubscribing")
+		if !sleep(ctx, delay) {
+			return
+		}
+	}
+}
+
+// drain forwards one subscription's events until its stream closes, reporting
+// whether it delivered any records (i.e. the subscription was healthy).
+func (w *MinIOWatcher) drain(bucket string, ch <-chan notification.Info, out chan<- ObjectEvent) bool {
+	healthy := false
 	for info := range ch {
 		if info.Err != nil {
 			log.Warn().Err(info.Err).Str("bucket", bucket).Msg("minio notification error")
 			continue
 		}
 		for _, rec := range info.Records {
+			healthy = true
 			out <- ObjectEvent{
 				Bucket:   rec.S3.Bucket.Name,
 				Key:      rec.S3.Object.Key,
@@ -91,4 +120,5 @@ func (w *MinIOWatcher) watchBucket(ctx context.Context, bucket string, out chan<
 			}
 		}
 	}
+	return healthy
 }

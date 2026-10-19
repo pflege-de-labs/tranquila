@@ -251,3 +251,40 @@ func TestSQSWatcher(t *testing.T) {
 		})
 	}
 }
+
+// scriptedSQSClient fails the calls listed in fail (1-based), succeeds empty otherwise.
+type scriptedSQSClient struct {
+	fail  map[int]bool
+	calls int
+}
+
+func (f *scriptedSQSClient) ReceiveMessage(context.Context, *sqs.ReceiveMessageInput, ...func(*sqs.Options)) (*sqs.ReceiveMessageOutput, error) {
+	f.calls++
+	if f.fail[f.calls] {
+		return nil, errors.New("AccessDenied")
+	}
+	return &sqs.ReceiveMessageOutput{}, nil
+}
+
+func (f *scriptedSQSClient) DeleteMessage(context.Context, *sqs.DeleteMessageInput, ...func(*sqs.Options)) (*sqs.DeleteMessageOutput, error) {
+	return &sqs.DeleteMessageOutput{}, nil
+}
+
+func TestSQSPollBacksOffAndResets(t *testing.T) {
+	// fail, fail, ok (reset), fail, fail, fail — the 5th sleep stops the loop.
+	fake := &scriptedSQSClient{fail: map[int]bool{1: true, 2: true, 4: true, 5: true, 6: true}}
+	rec := &recordingSleeper{limit: 5}
+	w := &SQSWatcher{client: fake, queueURL: "q", sleep: rec.sleep}
+	w.poll(context.Background(), make(chan ObjectEvent, 1))
+
+	if len(rec.delays) != 5 {
+		t.Fatalf("sleeps = %d, want 5", len(rec.delays))
+	}
+	// attempts 1, 2, then reset → 1, 2, 3
+	maxFor := []time.Duration{2 * retryBase, 3 * retryBase, 2 * retryBase, 3 * retryBase, 5 * retryBase}
+	for i, d := range rec.delays {
+		if d >= maxFor[i] {
+			t.Errorf("delay[%d] = %v, want < %v", i, d, maxFor[i])
+		}
+	}
+}
