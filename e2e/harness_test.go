@@ -22,7 +22,7 @@ const (
 	// ended community image distribution; quay.io/minio/minio now answers 401.
 	// Pinned to a multi-arch RELEASE tag (amd64 + arm64), not latest.
 	siloImage      = "docker.io/pgsty/silo:RELEASE.2026-10-18T00-00-00Z"
-	toxiproxyImage = "ghcr.io/shopify/toxiproxy:2.12.0"
+	toxiproxyImage = "ghcr.io/shopify/toxiproxy:2.13.0"
 	redisImage     = "redis:7-alpine"
 
 	s3User = "minioadmin"
