@@ -11,13 +11,13 @@ jobs:
   # Cheap and first, so a misplaced tag fails in seconds rather than after the
   # end-to-end suite and a two-platform build have already run.
   guard:
-    uses: pflege-de-labs/github-workflows/.github/workflows/release-guard.yml@d5b9ce5cc098cf3239e796f49d742a48140130c0 # v1.0.0
+    uses: pflege-de-labs/github-workflows/.github/workflows/release-guard.yml@cef33cface64a7ac3c33a5a8aea652095de518f7 # v1.1.0
 
   # The release rebuilds its artifacts, so the tagged commit is gated here
   # rather than relying on the CI run of whatever was pushed to main.
   verify:
     needs: guard
-    uses: pflege-de-labs/github-workflows/.github/workflows/go-checks.yml@d5b9ce5cc098cf3239e796f49d742a48140130c0 # v1.0.0
+    uses: pflege-de-labs/github-workflows/.github/workflows/go-checks.yml@cef33cface64a7ac3c33a5a8aea652095de518f7 # v1.1.0
     with:
       go-version: stable
       modules: ". e2e"
@@ -29,7 +29,7 @@ jobs:
 
   image:
     needs: [verify, e2e]
-    uses: pflege-de-labs/github-workflows/.github/workflows/image-release.yml@d5b9ce5cc098cf3239e796f49d742a48140130c0 # v1.0.0
+    uses: pflege-de-labs/github-workflows/.github/workflows/image-release.yml@cef33cface64a7ac3c33a5a8aea652095de518f7 # v1.1.0
     permissions:
       contents: read
       packages: write
@@ -40,7 +40,7 @@ jobs:
   # Reports, never gates: an outage there must not withhold the release (ADR 0007).
   secobserve:
     needs: image
-    uses: pflege-de-labs/github-workflows/.github/workflows/secobserve-image.yml@d5b9ce5cc098cf3239e796f49d742a48140130c0 # v1.0.0
+    uses: pflege-de-labs/github-workflows/.github/workflows/secobserve-image.yml@cef33cface64a7ac3c33a5a8aea652095de518f7 # v1.1.0
     permissions:
       contents: read
       packages: read
@@ -55,7 +55,7 @@ jobs:
   # created until the image it documents is published and verified.
   binaries:
     needs: image
-    uses: pflege-de-labs/github-workflows/.github/workflows/go-binaries.yml@d5b9ce5cc098cf3239e796f49d742a48140130c0 # v1.0.0
+    uses: pflege-de-labs/github-workflows/.github/workflows/go-binaries.yml@cef33cface64a7ac3c33a5a8aea652095de518f7 # v1.1.0
     permissions:
       contents: write
       id-token: write
