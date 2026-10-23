@@ -2,10 +2,10 @@
 // never reaches the production module or its govulncheck scope.
 module github.com/pflege-de-labs/tranquila/e2e
 
-go 1.26.0
+go 1.27.0
 
 require (
-	github.com/Shopify/toxiproxy/v2 v2.12.0
+	github.com/Shopify/toxiproxy/v2 v2.13.0
 	github.com/pflege-de-labs/tranquila v0.0.0
 	github.com/redis/go-redis/v9 v9.23.0
 	github.com/testcontainers/testcontainers-go v0.44.0
