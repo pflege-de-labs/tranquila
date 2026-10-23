@@ -16,7 +16,7 @@ require (
 	github.com/dustin/go-humanize v1.1.0
 	github.com/miekg/king v1.0.17
 	github.com/minio/minio-go/v7 v7.3.0
-	github.com/prometheus/client_golang v1.24.1
+	github.com/prometheus/client_golang v1.25.0
 	github.com/redis/go-redis/v9 v9.23.0
 	github.com/rs/zerolog v1.35.1
 	go.opentelemetry.io/otel v1.47.0
@@ -51,7 +51,7 @@ require (
 	github.com/gomarkdown/markdown v0.0.0-20260916113448-ad2c8ed2781a // indirect
 	github.com/google/uuid v1.6.0 // indirect
 	github.com/grpc-ecosystem/grpc-gateway/v2 v2.30.0 // indirect
-	github.com/klauspost/compress v1.20.0 // indirect
+	github.com/klauspost/compress v1.20.1 // indirect
 	github.com/klauspost/cpuid/v2 v2.4.0 // indirect
 	github.com/klauspost/crc32 v1.3.0 // indirect
 	github.com/kr/text v0.2.0 // indirect
