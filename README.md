@@ -807,3 +807,7 @@ Resume after interruption — rerun the same command. Pending and failed objects
 ## Graceful Shutdown
 
 On `SIGTERM` or `SIGINT`, Tranquila stops accepting new jobs and waits for in-flight transfers to complete before exiting.
+
+## License
+
+[Apache License 2.0](LICENSE).
